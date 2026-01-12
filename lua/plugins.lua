@@ -38,6 +38,30 @@ require("nvim-tree").setup({
     filters = { dotfiles = false, custom = {} },
     filesystem_watchers = { enable = true },
     git = { ignore = false },
+
+    view = {
+        float = {
+            enable = true,
+            quit_on_focus_loss = true,
+            open_win_config = function()
+                local columns = vim.opt.columns:get()
+                local lines = vim.opt.lines:get() - vim.opt.cmdheight:get()
+
+                local w = math.floor(columns * 0.25)
+                local h = math.floor(lines * 0.80)
+
+                return {
+                    border = "rounded",
+                    relative = "editor",
+                    width = w,
+                    height = h,
+                    row = math.floor((lines - h) * 0.5),
+                    col = math.floor((columns - w) * 0.5),
+                }
+            end,
+        },
+    },
+
     renderer = {
         icons = {
             show = { file = false, folder = false, folder_arrow = false, git = false },
@@ -56,6 +80,32 @@ require("nvim-tree").setup({
 
         api.config.mappings.default_on_attach(bufnr)
 
+        -- Cursorline only while focused in the tree; restore when leaving
+        local function set_tree_cursorline()
+            if vim.w._tree_prev_cursorline == nil then
+                vim.w._tree_prev_cursorline = vim.wo.cursorline
+                vim.w._tree_prev_cursorlineopt = vim.wo.cursorlineopt
+            end
+
+            vim.wo.cursorline = true
+            vim.wo.cursorlineopt = "line"
+        end
+
+        local function restore_tree_cursorline()
+            if vim.w._tree_prev_cursorline ~= nil then
+                vim.wo.cursorline = vim.w._tree_prev_cursorline
+                vim.w._tree_prev_cursorline = nil
+            end
+            if vim.w._tree_prev_cursorlineopt ~= nil then
+                vim.wo.cursorlineopt = vim.w._tree_prev_cursorlineopt
+                vim.w._tree_prev_cursorlineopt = nil
+            end
+        end
+
+        set_tree_cursorline()
+        vim.api.nvim_create_autocmd("BufEnter", { buffer = bufnr, callback = set_tree_cursorline })
+        vim.api.nvim_create_autocmd("BufLeave", { buffer = bufnr, callback = restore_tree_cursorline })
+
         local function o(desc)
             return { buffer = bufnr, silent = true, noremap = true, nowait = true, desc = desc }
         end
@@ -63,22 +113,22 @@ require("nvim-tree").setup({
         vim.keymap.set("n", "l", function()
             local node = api.tree.get_node_under_cursor()
             if node and node.type == "directory" then
-                api.node.open.edit() -- expands directory
+                api.node.open.edit()
             end
         end, o("Expand dir"))
 
         vim.keymap.set("n", "<CR>", function()
             local node = api.tree.get_node_under_cursor()
             if node and node.type == "directory" then
-                api.tree.change_root_to_node(node) -- step into dir (change root)
+                api.tree.change_root_to_node(node)
             else
-                api.node.open.edit() -- open file
+                api.node.open.edit()
             end
         end, o("Enter dir / open file"))
 
         vim.keymap.set({ "n", "v" }, "<Tab>", "<cmd>NvimTreeToggle<CR>", o("Toggle tree"))
 
-        -- Keep focus in tree after opening
+        -- (Your existing split/tab mappings unchanged below)
         vim.keymap.set("n", "<C-v>", function()
             local node = api.tree.get_node_under_cursor()
             if node and node.type == "directory" then
@@ -109,8 +159,6 @@ require("nvim-tree").setup({
 
             local curtab = vim.api.nvim_get_current_tabpage()
             api.node.open.tab()
-
-            -- jump back to the original tab and refocus tree
             vim.api.nvim_set_current_tabpage(curtab)
             api.tree.focus()
         end, o("Open tab (keep focus)"))
