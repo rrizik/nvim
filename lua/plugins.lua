@@ -34,6 +34,24 @@ vim.keymap.set('n', '<C-s>', tele.live_grep)
 --- End ---
 
 --- NVim Tree ---
+-- One function used both for initial open AND for resize updates
+local function tree_float_cfg()
+    local columns = vim.opt.columns:get() -- 240
+    local lines = vim.opt.lines:get() -- 56
+
+    local w = math.floor(columns * 0.25) -- 60
+    local h = math.floor(lines * 0.90) -- 50
+
+    return {
+        border = "rounded",
+        relative = "editor",
+        width = w,
+        height = h,
+        row = 1,
+        col = 4,
+    }
+end
+
 require("nvim-tree").setup({
     filters = { dotfiles = false, custom = {} },
     filesystem_watchers = { enable = true },
@@ -43,22 +61,7 @@ require("nvim-tree").setup({
         float = {
             enable = true,
             quit_on_focus_loss = true,
-            open_win_config = function()
-                local columns = vim.opt.columns:get()
-                local lines = vim.opt.lines:get() - vim.opt.cmdheight:get()
-
-                local w = math.floor(columns * 0.25)
-                local h = math.floor(lines * 0.80)
-
-                return {
-                    border = "rounded",
-                    relative = "editor",
-                    width = w,
-                    height = h,
-                    row = math.floor((lines - h) * 0.1),
-                    col = math.floor((columns - w) * 0.025),
-                }
-            end,
+            open_win_config = tree_float_cfg,
         },
     },
 
@@ -77,10 +80,9 @@ require("nvim-tree").setup({
 
     on_attach = function(bufnr)
         local api = require("nvim-tree.api")
-
         api.config.mappings.default_on_attach(bufnr)
 
-        -- Cursorline only inside the tree windo
+        -- Cursorline only inside the tree window
         vim.opt_local.cursorlineopt = "line"
 
         local function o(desc)
@@ -105,7 +107,6 @@ require("nvim-tree").setup({
 
         vim.keymap.set({ "n", "v" }, "<Tab>", "<cmd>NvimTreeToggle<CR>", o("Toggle tree"))
 
-        -- (Your existing split/tab mappings unchanged below)
         vim.keymap.set("n", "<C-v>", function()
             local node = api.tree.get_node_under_cursor()
             if node and node.type == "directory" then
@@ -142,6 +143,21 @@ require("nvim-tree").setup({
 
         vim.keymap.set("n", "u", api.tree.change_root_to_parent, o("Up dir"))
         vim.keymap.set("n", "h", api.node.navigate.parent_close, o("Close dir"))
+    end,
+})
+
+-- Update the existing NvimTree float when the editor is resized
+vim.api.nvim_create_autocmd("VimResized", {
+    callback = function()
+        for _, win in ipairs(vim.api.nvim_list_wins()) do
+            local buf = vim.api.nvim_win_get_buf(win)
+            if vim.bo[buf].filetype == "NvimTree" then
+                local cfg = vim.api.nvim_win_get_config(win)
+                if cfg.relative ~= "" then -- only floats
+                    vim.api.nvim_win_set_config(win, tree_float_cfg())
+                end
+            end
+        end
     end,
 })
 --- End ---
