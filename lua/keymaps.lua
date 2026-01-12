@@ -88,9 +88,13 @@ vim.api.nvim_create_autocmd("LspAttach", {
 -- Jumplist back/forward on Ctrl-[ / Ctrl-]
 vim.keymap.set("n", "<C-[>", "<C-o>", { noremap = true, silent = true })
 vim.keymap.set("n", "<C-]>", "<C-i>", { noremap = true, silent = true })
-
 --- End ---
 
+-- Remap <C-w>b to horizontal split (overrides built-in "go to bottom window")
+vim.keymap.set("n", "<C-w>b", "<C-w>s", { noremap = true, silent = true })
+
+-- (optional) If you still want a "go to bottom window" key, pick something else:
+-- vim.keymap.set("n", "<C-w>B", "<C-w>b", { noremap = true, silent = true })
 -- j/k traverse screen lines when wrap is on
 vim.keymap.set("n", "j", "gj", { noremap = true, silent = true })
 vim.keymap.set("n", "k", "gk", { noremap = true, silent = true })
@@ -100,12 +104,12 @@ vim.keymap.set("n", "<leader>]", "<cmd>tabmove +1<CR>", { noremap = true, silent
 vim.keymap.set("n", "<leader>[", "<cmd>tabmove -1<CR>", { noremap = true, silent = true })
 
 -- move lines up/down (normal/insert/visual) -- timer, if I don't use it much its being replaced with someting else
-vim.keymap.set("n", "<C-Down>", "<cmd>m .+1<CR>==", { noremap = true, silent = true })
-vim.keymap.set("n", "<C-Up>",   "<cmd>m .-2<CR>==", { noremap = true, silent = true })
-vim.keymap.set("i", "<C-Down>", "<Esc><cmd>m .+1<CR>==gi", { noremap = true, silent = true })
-vim.keymap.set("i", "<C-Up>",   "<Esc><cmd>m .-2<CR>==gi", { noremap = true, silent = true })
-vim.keymap.set("v", "<C-Down>", ":m '>+1<CR>gv=gv", { noremap = true, silent = true })
-vim.keymap.set("v", "<C-Up>",   ":m '<-2<CR>gv=gv", { noremap = true, silent = true })
+-- vim.keymap.set("n", "<C-Down>", "<cmd>m .+1<CR>==", { noremap = true, silent = true })
+-- vim.keymap.set("n", "<C-Up>",   "<cmd>m .-2<CR>==", { noremap = true, silent = true })
+-- vim.keymap.set("i", "<C-Down>", "<Esc><cmd>m .+1<CR>==gi", { noremap = true, silent = true })
+-- vim.keymap.set("i", "<C-Up>",   "<Esc><cmd>m .-2<CR>==gi", { noremap = true, silent = true })
+-- vim.keymap.set("v", "<C-Down>", ":m '>+1<CR>gv=gv", { noremap = true, silent = true })
+-- vim.keymap.set("v", "<C-Up>",   ":m '<-2<CR>gv=gv", { noremap = true, silent = true })
 
 -- keep cursor centered on half-page jumps
 vim.keymap.set("n", "<C-d>", "<C-d>zz", { noremap = true, silent = true })
@@ -128,3 +132,91 @@ vim.keymap.set("x", "<leader>p", [["_dP]], { noremap = true, silent = true })
 -- Commands: Hex / Hexb
 vim.api.nvim_create_user_command("Hex",  "%!xxd",   {})
 vim.api.nvim_create_user_command("Hexb", "%!xxd -r", {})
+
+
+--- VERTICAL/HORIZONTAL UP/DOWN/LEFT/RIGHT RESIZING ---
+local step_left_right = 20
+local step_up_down = 10
+local opts = { noremap = true, silent = true }
+
+local function winnr_cur()   return vim.fn.winnr() end
+local function winnr_left()  return vim.fn.winnr("h") end
+local function winnr_right() return vim.fn.winnr("l") end
+local function winnr_up()    return vim.fn.winnr("k") end
+local function winnr_down()  return vim.fn.winnr("j") end
+
+local function has_left()  return winnr_left()  ~= winnr_cur() end
+local function has_right() return winnr_right() ~= winnr_cur() end
+local function has_up()    return winnr_up()    ~= winnr_cur() end
+local function has_down()  return winnr_down()  ~= winnr_cur() end
+
+-- Ctrl: move LEFT bar (between left neighbor and current) by resizing LEFT neighbor
+local function ctrl_left()   -- move left bar LEFT (give current more space)
+  if not has_left() then return end
+  local cur = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd h")
+  vim.cmd("vertical resize -" .. step_left_right) -- shrink left neighbor => bar moves left
+  vim.api.nvim_set_current_win(cur)
+end
+
+local function ctrl_right()  -- move left bar RIGHT (give left neighbor more space)
+  if not has_left() then return end
+  local cur = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd h")
+  vim.cmd("vertical resize +" .. step_left_right) -- grow left neighbor => bar moves right
+  vim.api.nvim_set_current_win(cur)
+end
+
+-- Alt: move RIGHT bar (between current and right neighbor) by resizing CURRENT
+local function alt_left()    -- move right bar LEFT (give right neighbor more space)
+  if not has_right() then return end
+  vim.cmd("vertical resize -" .. step_left_right) -- shrink current => bar moves left
+end
+
+local function alt_right()   -- move right bar RIGHT (give current more space)
+  if not has_right() then return end
+  vim.cmd("vertical resize +" .. step_left_right) -- grow current => bar moves right
+end
+
+-- Ctrl: move TOP bar (between above neighbor and current) by resizing ABOVE neighbor
+local function ctrl_up()     -- move top bar UP (give current more space)
+  if not has_up() then return end
+  local cur = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd k")
+  vim.cmd("resize -" .. step_up_down) -- shrink above => bar moves up
+  vim.api.nvim_set_current_win(cur)
+end
+
+local function ctrl_down()   -- move top bar DOWN (give above more space)
+  if not has_up() then return end
+  local cur = vim.api.nvim_get_current_win()
+  vim.cmd("wincmd k")
+  vim.cmd("resize +" .. step_up_down) -- grow above => bar moves down
+  vim.api.nvim_set_current_win(cur)
+end
+
+-- Alt: move BOTTOM bar (between current and below neighbor) by resizing CURRENT
+local function alt_up()      -- move bottom bar UP (give below more space)
+  if not has_down() then return end
+  vim.cmd("resize -" .. step_up_down) -- shrink current => bar moves up
+end
+
+local function alt_down()    -- move bottom bar DOWN (give current more space)
+  if not has_down() then return end
+  vim.cmd("resize +" .. step_up_down) -- grow current => bar moves down
+end
+
+for _, mode in ipairs({ "n", "i", "v" }) do
+  -- left/right bars
+  vim.keymap.set(mode, "<C-Left>",  ctrl_left,  opts)
+  vim.keymap.set(mode, "<C-Right>", ctrl_right, opts)
+  vim.keymap.set(mode, "<A-Left>",  alt_left,   opts)
+  vim.keymap.set(mode, "<A-Right>", alt_right,  opts)
+
+  -- up/down bars
+  vim.keymap.set(mode, "<C-Up>",    ctrl_up,    opts)
+  vim.keymap.set(mode, "<C-Down>",  ctrl_down,  opts)
+  vim.keymap.set(mode, "<A-Up>",    alt_up,     opts)
+  vim.keymap.set(mode, "<A-Down>",  alt_down,   opts)
+end
+--- END ---
