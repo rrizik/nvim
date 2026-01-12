@@ -55,8 +55,8 @@ require("nvim-tree").setup({
                     relative = "editor",
                     width = w,
                     height = h,
-                    row = math.floor((lines - h) * 0.5),
-                    col = math.floor((columns - w) * 0.5),
+                    row = math.floor((lines - h) * 0.1),
+                    col = math.floor((columns - w) * 0.025),
                 }
             end,
         },
@@ -80,31 +80,8 @@ require("nvim-tree").setup({
 
         api.config.mappings.default_on_attach(bufnr)
 
-        -- Cursorline only while focused in the tree; restore when leaving
-        local function set_tree_cursorline()
-            if vim.w._tree_prev_cursorline == nil then
-                vim.w._tree_prev_cursorline = vim.wo.cursorline
-                vim.w._tree_prev_cursorlineopt = vim.wo.cursorlineopt
-            end
-
-            vim.wo.cursorline = true
-            vim.wo.cursorlineopt = "line"
-        end
-
-        local function restore_tree_cursorline()
-            if vim.w._tree_prev_cursorline ~= nil then
-                vim.wo.cursorline = vim.w._tree_prev_cursorline
-                vim.w._tree_prev_cursorline = nil
-            end
-            if vim.w._tree_prev_cursorlineopt ~= nil then
-                vim.wo.cursorlineopt = vim.w._tree_prev_cursorlineopt
-                vim.w._tree_prev_cursorlineopt = nil
-            end
-        end
-
-        set_tree_cursorline()
-        vim.api.nvim_create_autocmd("BufEnter", { buffer = bufnr, callback = set_tree_cursorline })
-        vim.api.nvim_create_autocmd("BufLeave", { buffer = bufnr, callback = restore_tree_cursorline })
+        -- Cursorline only inside the tree windo
+        vim.opt_local.cursorlineopt = "line"
 
         local function o(desc)
             return { buffer = bufnr, silent = true, noremap = true, nowait = true, desc = desc }
