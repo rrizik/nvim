@@ -31,8 +31,8 @@ local function set_tree_bg()
     hi("NvimTreeWinSeparator", { bg = background })
     hi("NvimTreeVertSplit",    { bg = background })
     hi("NvimTreeCursorLine",   { bg = background })
-    hi("NvimTreeRootFolder",   { fg = comment, bg = bg })
-    hi("NvimTreeEndOfBuffer",  { fg = comment, bg = bg })
+    hi("NvimTreeRootFolder",   { fg = comment,    bg = background })
+    hi("NvimTreeEndOfBuffer",  { fg = comment,    bg = background })
     hi("NvimTreeCursorLine",   { fg = background, bg = normal, bold = true })
 end
 

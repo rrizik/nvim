@@ -60,7 +60,7 @@ require("nvim-tree").setup({
     view = {
         float = {
             enable = true,
-            quit_on_focus_loss = true,
+            quit_on_focus_loss = false,
             open_win_config = tree_float_cfg,
         },
     },
@@ -89,6 +89,19 @@ require("nvim-tree").setup({
             return { buffer = bufnr, silent = true, noremap = true, nowait = true, desc = desc }
         end
 
+        local function with_tree_focus_loss_suppressed(fn)
+            tree_focus_loss_suppressed = true
+            local ok, err = pcall(fn)
+            vim.schedule(function()
+                tree_focus_loss_suppressed = false
+            end)
+            if not ok then
+                vim.notify(err, vim.log.levels.ERROR)
+            end
+        end
+
+        vim.keymap.set({ "n", "v" }, "<Tab>", "<cmd>NvimTreeToggle<CR>", o("Toggle tree"))
+
         vim.keymap.set("n", "l", function()
             local node = api.tree.get_node_under_cursor()
             if node and node.type == "directory" then
@@ -105,16 +118,15 @@ require("nvim-tree").setup({
             end
         end, o("Enter dir / open file"))
 
-        vim.keymap.set({ "n", "v" }, "<Tab>", "<cmd>NvimTreeToggle<CR>", o("Toggle tree"))
-
         vim.keymap.set("n", "<C-v>", function()
             local node = api.tree.get_node_under_cursor()
             if node and node.type == "directory" then
                 api.node.open.edit()
                 return
             end
-            api.node.open.vertical()
-            api.tree.focus()
+            with_tree_focus_loss_suppressed(function()
+                api.node.open.vertical(node, { focus = false })
+            end)
         end, o("Open vertical (keep focus)"))
 
         vim.keymap.set("n", "<C-b>", function()
@@ -123,8 +135,9 @@ require("nvim-tree").setup({
                 api.node.open.edit()
                 return
             end
-            api.node.open.horizontal()
-            api.tree.focus()
+            with_tree_focus_loss_suppressed(function()
+                api.node.open.horizontal(node, { focus = false })
+            end)
         end, o("Open horizontal (keep focus)"))
 
         vim.keymap.set("n", "<C-t>", function()
@@ -134,15 +147,30 @@ require("nvim-tree").setup({
                 api.node.open.edit()
                 return
             end
-
-            local curtab = vim.api.nvim_get_current_tabpage()
-            api.node.open.tab()
-            vim.api.nvim_set_current_tabpage(curtab)
-            api.tree.focus()
+            api.node.open.tab(node)
+            vim.schedule(function()
+                api.tree.find_file({ open = true, focus = true })
+            end)
         end, o("Open tab (keep focus)"))
 
         vim.keymap.set("n", "u", api.tree.change_root_to_parent, o("Up dir"))
         vim.keymap.set("n", "h", api.node.navigate.parent_close, o("Close dir"))
+    end,
+})
+
+local focus_group = vim.api.nvim_create_augroup("UserNvimTreeFocusLoss", { clear = true })
+
+vim.api.nvim_create_autocmd("WinLeave", {
+    group = focus_group,
+    pattern = "NvimTree_*",
+    callback = function()
+        if tree_focus_loss_suppressed then
+            return
+        end
+        local view = require("nvim-tree.view")
+        if view.View.float and view.View.float.enable then
+            view.close()
+        end
     end,
 })
 
@@ -160,7 +188,6 @@ vim.api.nvim_create_autocmd("VimResized", {
         end
     end,
 })
---- End ---
 
 -- global tree toggle
 vim.keymap.set({"n", "v"}, "<Tab>", "<cmd>NvimTreeToggle<CR>",  { silent = true, noremap = true, nowait = true })
