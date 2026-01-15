@@ -29,7 +29,18 @@ require("telescope").setup({
 })
 
 local tele = require('telescope.builtin')
-vim.keymap.set('n', '<C-p>', tele.find_files)
+local DOTDIR_IGNORE = {
+  "^%.[^/\\]+[/\\]",     -- leading dot dir
+  "[/\\]%.[^/\\]+[/\\]", -- dot dir in path
+}
+local function find_project_files()
+  local ok = pcall(tele.git_files, { show_untracked = true, file_ignore_patterns = DOTDIR_IGNORE })
+  if not ok then
+    tele.find_files({ file_ignore_patterns = DOTDIR_IGNORE })
+  end
+end
+vim.keymap.set('n', '<C-p>', find_project_files)
+vim.keymap.set('n', '<leader>g', tele.find_files)
 vim.keymap.set('n', '<C-s>', tele.live_grep)
 --- End ---
 
@@ -54,7 +65,7 @@ end
 
 require("nvim-tree").setup({
     filters = { dotfiles = false, custom = {} },
-    filesystem_watchers = { enable = true },
+    filesystem_watchers = { enable = false },
     git = { ignore = false },
 
     view = {
@@ -187,6 +198,13 @@ vim.api.nvim_create_autocmd("VimResized", {
             end
         end
     end,
+})
+
+vim.api.nvim_create_autocmd("User", {
+  pattern = "NvimTreeOpen",
+  callback = function()
+    vim.cmd("NvimTreeRefresh")
+  end,
 })
 
 -- global tree toggle

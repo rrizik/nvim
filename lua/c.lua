@@ -59,6 +59,17 @@ function M.setup()
         end,
     })
 
+    -- Re-apply on buffer enter to avoid missed timing in some sessions.
+    vim.api.nvim_create_autocmd("BufEnter", {
+        group = group,
+        pattern = { "*.c", "*.cpp", "*.h", "*.hpp" },
+        callback = function()
+            vim.schedule(function()
+                M.apply()
+            end)
+        end,
+    })
+
     -- Your colorscheme runs :syntax reset, so re-apply across open C/C++ buffers.
     vim.api.nvim_create_autocmd("ColorScheme", {
         group = group,

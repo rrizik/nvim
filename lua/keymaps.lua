@@ -55,6 +55,8 @@ vim.keymap.set("n", "<C-b>", function()
   if not ok then vim.cmd.clast() end
 end, { silent = true })
 
+vim.keymap.set("n", "<C-j>", "<cmd>wall<CR>", { silent = true, noremap = true })
+
 vim.keymap.set("n", "<leader>q", "<cmd>copen<CR>", { silent = true })
 vim.keymap.set("n", "<leader>x", "<cmd>cclose<CR>", { silent = true })
 --- End ---
