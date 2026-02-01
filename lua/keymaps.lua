@@ -13,6 +13,7 @@ local function build_async()
   local function on_data(_, data)
     if not data then return end
     for _, s in ipairs(data) do
+      s = s:gsub("\r", "")
       if s ~= "" then table.insert(lines, s) end
     end
   end
@@ -32,11 +33,24 @@ local function build_async()
         lines = lines,
         efm = vim.o.errorformat,
       })
+      vim.g.qf_first_pending = 1
 
       -- open quickfix only if there are entries
       vim.schedule(function()
+        local qf = vim.fn.getqflist()
+        local total = #qf
+        local errors = 0
+        for _, item in ipairs(qf) do
+          if item.valid == 1 then
+            local text = (item.text or ""):lower()
+            local is_note = text:find("declaration of", 1, true) or text:find("note:", 1, true)
+            if not is_note and (item.type == "E" or item.type == "") then
+              errors = errors + 1
+            end
+          end
+        end
         vim.cmd("cwindow")
-        vim.api.nvim_echo({ { ("Build finished (exit %d)"):format(code), "None" } }, false, {})
+        vim.api.nvim_echo({ { ("Build finished (exit %d) - %d errors (%d items)"):format(code, errors, total), "None" } }, false, {})
       end)
     end,
   })
@@ -45,9 +59,54 @@ vim.keymap.set("n", "<C-k>", build_async, { silent = true, noremap = true })
 --- End ---
 
 --- Quickfix Mappings ---
+local function qf_is_error(item)
+  if item.valid ~= 1 then return false end
+  local text = (item.text or ""):lower()
+  if text:find("declaration of", 1, true) or text:find("note:", 1, true) then
+    return false
+  end
+  return item.type == "E" or item.type == ""
+end
+
+local function qf_jump_to_first_error()
+  local qf = vim.fn.getqflist()
+  for i, item in ipairs(qf) do
+    if qf_is_error(item) then
+      vim.cmd(("cc %d"):format(i))
+      return true
+    end
+  end
+  return false
+end
+
+local function qf_jump_to_next_error()
+  local qf = vim.fn.getqflist()
+  if #qf == 0 then return end
+  local info = vim.fn.getqflist({ idx = 0 })
+  local start = info.idx or 0
+  for i = start + 1, #qf do
+    if qf_is_error(qf[i]) then
+      vim.cmd(("cc %d"):format(i))
+      return
+    end
+  end
+  for i = 1, start do
+    if qf_is_error(qf[i]) then
+      vim.cmd(("cc %d"):format(i))
+      return
+    end
+  end
+  vim.cmd.cfirst()
+end
+
 vim.keymap.set("n", "<C-n>", function()
-  local ok = pcall(vim.cmd.cnext)
-  if not ok then vim.cmd.cfirst() end
+  local qf = vim.fn.getqflist()
+  if #qf == 0 then return end
+  if vim.g.qf_first_pending == 1 then
+    vim.g.qf_first_pending = 0
+    if qf_jump_to_first_error() then return end
+  end
+  qf_jump_to_next_error()
 end, { silent = true })
 
 vim.keymap.set("n", "<C-b>", function()
@@ -59,12 +118,6 @@ vim.keymap.set("n", "<C-j>", "<cmd>wall<CR>", { silent = true, noremap = true })
 
 vim.keymap.set("n", "<leader>q", "<cmd>copen<CR>", { silent = true })
 vim.keymap.set("n", "<leader>x", "<cmd>cclose<CR>", { silent = true })
---- End ---
-
---- F3: open init.lua ---
-vim.keymap.set("n", "<F3>", function()
-  vim.cmd("tabedit " .. vim.fn.stdpath("config") .. "/init.lua")
-end, { silent = true })
 --- End ---
 
 --- F4: open your colorscheme file ---
@@ -126,15 +179,18 @@ vim.keymap.set("n", "g*", "g*zz", { noremap = true, silent = true })
 vim.keymap.set("n", "g#", "g#zz", { noremap = true, silent = true })
 
 -- search/replace word under cursor (cursor placed before replacement)
-vim.keymap.set("n", "<leader>s", [[:%s/<C-r><C-w>//gc<Left><Left><Left>]], { noremap = true, silent = true })
-
+-- vim.keymap.set("n", "<leader>s", [[:%s/<C-r><C-w>//g<Left><Left>]], { noremap = true, silent = true })
+-- vim.keymap.set("x", "<leader>s", [["zy:%s#\V<C-r>z##g<Left><Left>]], { noremap = true, silent = true })
+vim.keymap.set("n", "<leader>s", ":%s/<C-r><C-w>//g<Left><Left>", { noremap = true, silent = true })
+vim.keymap.set("x", "<leader>s", "y:%s/<C-r>\"//g<Left><Left>", { noremap = true, silent = true })
 -- paste over selection without yanking replaced text (NOTE: this is usually a VISUAL-mode map)
 vim.keymap.set("x", "<leader>p", [["_dP]], { noremap = true, silent = true })
+-- backspace word in insert mode
+vim.keymap.set("i", "<C-BS>", "<C-w>", { silent = true, noremap = true })
 
 -- Commands: Hex / Hexb
 vim.api.nvim_create_user_command("Hex",  "%!xxd",   {})
 vim.api.nvim_create_user_command("Hexb", "%!xxd -r", {})
-
 
 --- VERTICAL/HORIZONTAL UP/DOWN/LEFT/RIGHT RESIZING ---
 local step_left_right = 20
