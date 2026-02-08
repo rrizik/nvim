@@ -5,14 +5,29 @@ vim.cmd [[packadd packer.nvim]]
 require('packer').startup(function(use)
     -- Packer can manage itself
     use 'wbthomason/packer.nvim'
-    use { 'nvim-telescope/telescope-fzf-native.nvim', run = 'cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release --target install' }
-    use { 'nvim-telescope/telescope.nvim', tag = '*', requires = { { 'nvim-lua/plenary.nvim' } } }
+    use {
+        'nvim-telescope/telescope-fzf-native.nvim',
+        run = 'cmake -S. -Bbuild -DCMAKE_BUILD_TYPE=Release && cmake --build build --config Release --target install',
+        after = 'telescope.nvim',
+    }
+    use {
+        'nvim-telescope/telescope.nvim',
+        tag = '*',
+        requires = { { 'nvim-lua/plenary.nvim' } },
+        module = 'telescope',
+        cmd = 'Telescope',
+    }
     -- use { 'nvim-tree/nvim-tree.lua' }
 end)
 
 --- Telescope ---
-local actions = require("telescope.actions")
-local action_state = require("telescope.actions.state")
+local DOTDIR_IGNORE = {
+    "^%.[^/\\]+[/\\]",     -- leading dot dir
+    "[/\\]%.[^/\\]+[/\\]", -- dot dir in path
+}
+
+local Telescope_Builtin = nil
+local Telescope_Ready = false
 
 local function entry_abs_path(entry)
   -- Covers most telescope pickers
@@ -25,63 +40,78 @@ local function entry_abs_path(entry)
   return vim.loop.fs_realpath(p) or vim.fn.fnamemodify(p, ":p")
 end
 
-local function open_with(cmd)
-  return function(prompt_bufnr)
-    local entry = action_state.get_selected_entry()
-    actions.close(prompt_bufnr)
+local function setup_telescope_once()
+    if Telescope_Ready then
+        return
+    end
 
-    local p = entry_abs_path(entry)
-    if not p or p == "" then return end
+    local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
 
-    -- Open using canonical absolute path
-    vim.cmd(cmd .. " " .. vim.fn.fnameescape(p))
-  end
-end
+    local function open_with(cmd)
+        return function(prompt_bufnr)
+            local entry = action_state.get_selected_entry()
+            actions.close(prompt_bufnr)
 
-require("telescope").setup({
-    defaults = {
-        mappings = {
-            i = {
-                ["<CR>"]  = open_with("edit"),
-                ["<C-v>"] = open_with("vsplit"),
-                ["<C-b>"] = open_with("split"),
-                ["<C-t>"] = open_with("tabedit"),
-            },
-            n = {
-                ["<CR>"]  = open_with("edit"),
-                ["<C-v>"] = open_with("vsplit"),
-                ["<C-b>"] = open_with("split"),
-                ["<C-t>"] = open_with("tabedit"),
+            local p = entry_abs_path(entry)
+            if not p or p == "" then return end
+
+            -- Open using canonical absolute path
+            vim.cmd(cmd .. " " .. vim.fn.fnameescape(p))
+        end
+    end
+
+    require("telescope").setup({
+        defaults = {
+            mappings = {
+                i = {
+                    ["<CR>"]  = open_with("edit"),
+                    ["<C-v>"] = open_with("vsplit"),
+                    ["<C-b>"] = open_with("split"),
+                    ["<C-t>"] = open_with("tabedit"),
+                },
+                n = {
+                    ["<CR>"]  = open_with("edit"),
+                    ["<C-v>"] = open_with("vsplit"),
+                    ["<C-b>"] = open_with("split"),
+                    ["<C-t>"] = open_with("tabedit"),
+                },
             },
         },
-    },
-    pickers = {
-        find_files = { previewer = false },
-        git_files = { previewer = false },
-    }
-})
+        pickers = {
+            find_files = { previewer = false },
+            git_files = { previewer = false },
+        },
+    })
 
-local tele = require('telescope.builtin')
-local DOTDIR_IGNORE = {
-    "^%.[^/\\]+[/\\]",     -- leading dot dir
-    "[/\\]%.[^/\\]+[/\\]", -- dot dir in path
-}
+    Telescope_Builtin = require("telescope.builtin")
+    Telescope_Ready = true
+end
+
 local function find_project_files()
-    local ok = pcall(tele.git_files, { show_untracked = true, file_ignore_patterns = DOTDIR_IGNORE })
+    setup_telescope_once()
+
+    local ok = pcall(Telescope_Builtin.git_files, { show_untracked = true, file_ignore_patterns = DOTDIR_IGNORE })
     if not ok then
-        tele.find_files({ file_ignore_patterns = DOTDIR_IGNORE })
+        Telescope_Builtin.find_files({ file_ignore_patterns = DOTDIR_IGNORE })
     end
 end
+
 vim.keymap.set('n', '<C-p>', find_project_files)
--- vim.keymap.set('n', '<leader>g', tele.find_files)
+
 vim.keymap.set('n', '<leader>g', function()
-  tele.find_files({
-    hidden = true,
-    no_ignore = true,
-    no_ignore_parent = true,
-  })
+    setup_telescope_once()
+    Telescope_Builtin.find_files({
+        hidden = true,
+        no_ignore = true,
+        no_ignore_parent = true,
+    })
 end)
-vim.keymap.set('n', '<C-s>', tele.live_grep)
+
+vim.keymap.set('n', '<C-s>', function()
+    setup_telescope_once()
+    Telescope_Builtin.live_grep()
+end)
 --- End ---
 
 --- NVim Tree ---

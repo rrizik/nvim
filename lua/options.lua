@@ -1,7 +1,7 @@
 -- lua/options.lua
 
--- vim.g.loaded_netrw = 1        -- stop loading netrw
--- vim.g.loaded_netrwPlugin = 1  -- stop loading netrw's plugin features
+vim.g.loaded_netrw = 1        -- stop loading netrw
+vim.g.loaded_netrwPlugin = 1  -- stop loading netrw's plugin features
 vim.g.mapleader = " "
 
 vim.opt.termguicolors = true     -- enable 24-bit (truecolor) highlighting
@@ -135,54 +135,43 @@ local function enable_if_exe(name, cfg)
     end
 end
 
-local lsp_aug = vim.api.nvim_create_augroup("UserLspLazyEnable", { clear = true })
-
-vim.api.nvim_create_autocmd("FileType", {
-    group = lsp_aug,
-    pattern = { "c", "cpp", "objc", "objcpp" },
-    callback = function()
-        enable_if_exe("clangd", {
+local Lsp_Servers = {
+    {
+        name = "clangd",
+        cfg = {
             cmd = { "clangd" },
             filetypes = { "c", "cpp", "objc", "objcpp" },
             init_options = {
                 fallbackFlags = { "-I" .. "C:/sh1tz/apesticks/cc++/base/code" },
             },
-        })
-    end,
-})
-
-vim.api.nvim_create_autocmd("FileType", {
-    group = lsp_aug,
-    pattern = { "python" },
-    callback = function()
-        enable_if_exe("pyright", {
+        },
+    },
+    {
+        name = "pyright",
+        cfg = {
             cmd = { "pyright-langserver", "--stdio" },
             filetypes = { "python" },
-        })
-    end,
-})
-
-vim.api.nvim_create_autocmd("FileType", {
-    group = lsp_aug,
-    pattern = { "odin" },
-    callback = function()
-        enable_if_exe("ols", {
+        },
+    },
+    {
+        name = "ols",
+        cfg = {
             cmd = { "ols" },
             filetypes = { "odin" },
-        })
-    end,
-})
-
-vim.api.nvim_create_autocmd("FileType", {
-    group = lsp_aug,
-    pattern = { "jai" },
-    callback = function()
-        enable_if_exe("jails", {
+        },
+    },
+    {
+        name = "jails",
+        cfg = {
             cmd = { "jails" },
             filetypes = { "jai" },
-        })
-    end,
-})
+        },
+    },
+}
+
+for _, server in ipairs(Lsp_Servers) do
+    enable_if_exe(server.name, server.cfg)
+end
 
 -- turn off stupid LSP warning and error programming suggestions
 vim.diagnostic.config({
