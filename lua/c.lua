@@ -16,18 +16,18 @@ function M.apply()
     hi def link cGreen  SoftGreen
 
     " --- function-ish tokens: foo( ---
-    syn match MyFuncCall /\v<[_A-Za-z]\w*\ze\s*\(/ containedin=ALLBUT,cComment,cCommentL,cString,cCppString,cCharacter
-    hi def link MyFuncCall Function
+    "syn match MyFuncCall /\v<[_A-Za-z]\w*\ze\s*\(/ containedin=ALLBUT,cComment,cCommentL,cString,cCppString,cCharacter
+    "hi def link MyFuncCall Function
 
-    " --- type-ish tokens by naming convention ---
-    " Matches: Type, ThisKindOfType, This_Kind_Of_Type (requires at least one lowercase, avoids ALL_CAPS)
-    syn match MyTypeName /\v<\u\w*\l\w*>/ containedin=ALLBUT,cComment,cCommentL,cString,cCppString,cCharacter
-    hi def link MyTypeName Type
+    "" --- type-ish tokens by naming convention ---
+    "" Matches: Type, ThisKindOfType, This_Kind_Of_Type (requires at least one lowercase, avoids ALL_CAPS)
+    "syn match MyTypeName /\v<\u\w*\l\w*>/ containedin=ALLBUT,cComment,cCommentL,cString,cCppString,cCharacter
+    "hi def link MyTypeName Type
 
-    " --- typedef: highlight the alias being defined ---
-    " typedef <stuff> NAME;
-    syn match MyTypedefName /\v<typedef>\_.{-}\zs<[_A-Za-z]\w*>\ze\s*;/ containedin=ALLBUT,cComment,cCommentL,cString,cCppString,cCharacter
-    hi def link MyTypedefName Type
+    "" --- typedef: highlight the alias being defined ---
+    "" typedef <stuff> NAME;
+    "syn match MyTypedefName /\v<typedef>\_.{-}\zs<[_A-Za-z]\w*>\ze\s*;/ containedin=ALLBUT,cComment,cCommentL,cString,cCppString,cCharacter
+    "hi def link MyTypedefName Type
 
     " --- explicit typedef aliases (you can remove later if you want) ---
     syn keyword cType i8 i16 i32 i64 s8 s16 s32 s64 u8 u16 u32 u64 f16 f32 f64 v2s32 v2 v3 v4 vec2 vec3 vec4 I8 I16 I32 I64 S8 S16 S32 S64 U8 U16 U32 U64 F16 F32 F64 V2S32 V2 V3 V4 VEC2 VEC3 VEC4 RGBA wchar global local_static local function def m2 m3 m4 M2 M3 M4 mat1 mat2 mat3 MAT1 MAT2 MAT3 Arena ScratchArena PoolArena PoolFreeNode String8 String16 String32 String8Node String8Join String8List
