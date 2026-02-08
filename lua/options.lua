@@ -1,96 +1,106 @@
 -- lua/options.lua
 
-vim.g.loaded_netrw = 1        -- stop loading netrw
-vim.g.loaded_netrwPlugin = 1  -- stop loading netrw's plugin features
+-- Basic startup globals.
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPlugin = 1
 vim.g.mapleader = " "
 
-vim.opt.termguicolors = true     -- enable 24-bit (truecolor) highlighting
-vim.cmd.syntax("on")             -- enable syntax highlighting
-vim.cmd.colorscheme("custom")    -- set colorscheme
-vim.opt.guifont = "Consolas:h11" -- set GUI font
+-- UI/bootstrap settings.
+vim.opt.termguicolors = true
+vim.opt.guifont = "Consolas:h11"
+vim.cmd.syntax("on")
+vim.cmd.colorscheme("custom")
 
-vim.opt.magic = false         -- / search does literal matches
+-- Search behavior.
+vim.opt.magic = false
 vim.opt.incsearch = true
 vim.opt.hlsearch = false
-vim.opt.ignorecase = false     -- case-sensitive searching by default
+vim.opt.ignorecase = false
 
-vim.opt.belloff = "all"       -- disable all bell/visual bell
-vim.opt.autoindent = true     -- copy indent from current line to the next
-vim.opt.smartindent = true    -- smarter autoindent for code-like files
-vim.opt.tabstop = 4           -- display width of a literal <Tab> character
-vim.opt.shiftwidth = 4        -- indent width for >> << and autoindent
-vim.opt.softtabstop = 4       -- <Tab>/<BS> feel like 4 spaces in insert mode
-vim.opt.shiftround = false    -- don't round indent to multiples of shiftwidth
-vim.opt.expandtab = true      -- insert spaces instead of literal <Tab>
+-- Editing/indent behavior.
+vim.opt.autoindent = true
+vim.opt.smartindent = true
+vim.opt.tabstop = 4
+vim.opt.shiftwidth = 4
+vim.opt.softtabstop = 4
+vim.opt.shiftround = false
+vim.opt.expandtab = true
+vim.opt.backspace = { "indent", "eol", "start" }
+vim.opt.cinoptions = "l1"
 
-vim.opt.scrolloff = 0         -- vertical cursor margin from top/bottom
-vim.opt.sidescrolloff = 4     -- horizontal cursor margin from left/right edge
-vim.opt.backspace = { "indent", "eol", "start" } -- allow backspace over indent/EOL/start
-vim.opt.compatible = false    -- disable old Vi compatibility behaviors
--- vim.opt.autoread = true       -- auto-reload files changed on disk (when safe)
-vim.opt.clipboard = "unnamedplus" -- all copy paste is system level
-vim.opt.splitright = true     -- :vsplit opens to the right
-vim.opt.splitbelow = true     -- :split opens below
-vim.opt.ruler = true          -- show cursor position info
-vim.opt.paste = false         -- ensure 'paste' mode is off
-vim.opt.number = false        -- line numbers OFF (your comment was backwards)
-vim.opt.mouse = "a"           -- enable mouse in all modes
-vim.opt.list = false          -- don't show whitespace chars
+-- Window/navigation behavior.
+vim.opt.scrolloff = 0
+vim.opt.sidescrolloff = 4
+vim.opt.splitright = true
+vim.opt.splitbelow = true
+vim.opt.wrap = true
+vim.opt.linebreak = true
 
-vim.opt.wrap = true           -- wrap long linekk/terms
-vim.opt.linebreak = true      -- wrap at word boundaries
+-- Misc editor behavior.
+vim.opt.belloff = "all"
+vim.opt.compatible = false
+vim.opt.clipboard = "unnamedplus"
+vim.opt.ruler = true
+vim.opt.paste = false
+vim.opt.number = false
+vim.opt.mouse = "a"
+vim.opt.list = false
+vim.opt.guicursor = "a:blinkon0"
+vim.opt.foldcolumn = "0"
+vim.opt.title = true
+vim.opt.titlestring = "%t"
 
-vim.opt.guicursor = "a:blinkon0"   -- disable cursor blinking (GUI-dependent)
-vim.opt.foldcolumn = "0"      -- no fold column
-vim.opt.cinoptions = "l1"     -- C indent tweak (case:{ style)
-vim.opt.title = true          -- enable setting the window title
-vim.opt.titlestring = "%t"    -- %t = tail (filename)
-
-vim.o.tabline = "%!v:lua.TabLine()"
-function _G.TabLine()
-  local s = ""
-  for t = 1, vim.fn.tabpagenr("$") do
-    local b = vim.fn.tabpagebuflist(t)[vim.fn.tabpagewinnr(t)]
-    local n = vim.fn.fnamemodify(vim.fn.bufname(b), ":t")
-    if n == "" then n = "[No Name]" end
-    s = s .. ((t==vim.fn.tabpagenr()) and "%#TabLineSel#" or "%#TabLine#")
-      .. " %" .. t .. "T " .. n .. " %T"
-  end
-  return s .. "%#TabLineFill#%="
+-- Custom tabline (file name for each tab).
+local function tab_line()
+    local s = ""
+    for t = 1, vim.fn.tabpagenr("$") do
+        local b = vim.fn.tabpagebuflist(t)[vim.fn.tabpagewinnr(t)]
+        local n = vim.fn.fnamemodify(vim.fn.bufname(b), ":t")
+        if n == "" then
+            n = "[No Name]"
+        end
+        s = s
+            .. ((t == vim.fn.tabpagenr()) and "%#TabLineSel#" or "%#TabLine#")
+            .. " %"
+            .. t
+            .. "T "
+            .. n
+            .. " %T"
+    end
+    return s .. "%#TabLineFill#%="
 end
+_G.TabLine = tab_line
 vim.o.tabline = "%!v:lua.TabLine()"
 
---- Setup make and error formats ---
+-- Build command and quickfix error parser.
 vim.opt.makeprg = [[cmd.exe /c ..\misc\build.bat]]
 vim.opt.errorformat = table.concat({
-    -- clang/clang++/gcc style: file:line:col: <type>: message
+    -- clang/gcc style.
     [[%f:%l:%c:\ %trror:\ %m]],
     [[%f:%l:%c:\ %tarning:\ %m]],
     [[%f:%l:%c:\ %tote:\ %m]],
-    -- clang/gcc without column
     [[%f:%l:\ %trror:\ %m]],
     [[%f:%l:\ %tarning:\ %m]],
     [[%f:%l:\ %tote:\ %m]],
 
-    -- clang-cl style: file(line,col): <type>: message
+    -- clang-cl style.
     [[%f(%l\\,%c):\ %trror:\ %m]],
     [[%f(%l\\,%c):\ %tarning:\ %m]],
     [[%f(%l\\,%c):\ %tote:\ %m]],
 
-    -- MSVC cl.exe style: file(line): error C####: message (or warning/fatal error)
-    [[%f(%l):\ %*[^ ]\ %*[^ ]\ %m]],     -- catches "fatal error C####:" etc. loosely
+    -- cl.exe style.
+    [[%f(%l):\ %*[^ ]\ %*[^ ]\ %m]],
     [[%f(%l):\ %trror\ %m]],
     [[%f(%l):\ %tarning\ %m]],
 
-    -- Linker-ish / no file:line (keep message)
+    -- Fallback linker-ish messages.
     [[%*[^:]:\ %m]],
 }, ",")
---- End ---
 
-local aug = vim.api.nvim_create_augroup("LiveSearchHL", { clear = true })
-
+-- Only show hlsearch while typing / or ?.
+local live_search_hl_group = vim.api.nvim_create_augroup("LiveSearchHL", { clear = true })
 vim.api.nvim_create_autocmd("CmdlineEnter", {
-    group = aug,
+    group = live_search_hl_group,
     callback = function()
         local t = vim.fn.getcmdtype()
         if t == "/" or t == "?" then
@@ -98,9 +108,8 @@ vim.api.nvim_create_autocmd("CmdlineEnter", {
         end
     end,
 })
-
 vim.api.nvim_create_autocmd("CmdlineLeave", {
-    group = aug,
+    group = live_search_hl_group,
     callback = function()
         local t = vim.fn.getcmdtype()
         if t == "/" or t == "?" then
@@ -109,14 +118,14 @@ vim.api.nvim_create_autocmd("CmdlineLeave", {
         end
     end,
 })
---- End ---
 
---- LSP ---
--- Warn once per missing server executable
-local _missing_lsp_exe_warned = {}
-local function enable_if_exe(name, cfg)
+-- LSP enable-once helper.
+local missing_lsp_exe_warned = {}
+local function enable_lsp_if_executable(name, cfg)
     local exe = cfg.cmd and cfg.cmd[1]
-    if not exe then return end
+    if not exe then
+        return
+    end
 
     if vim.fn.executable(exe) == 1 then
         vim.lsp.config(name, cfg)
@@ -124,56 +133,46 @@ local function enable_if_exe(name, cfg)
         return
     end
 
-    if not _missing_lsp_exe_warned[exe] then
-        _missing_lsp_exe_warned[exe] = true
-        vim.schedule(function()
-            vim.notify(
-                ("LSP '%s' not enabled: executable '%s' not found in PATH"):format(name, exe),
-                vim.log.levels.WARN
-            )
-        end)
+    if missing_lsp_exe_warned[exe] then
+        return
     end
+    missing_lsp_exe_warned[exe] = true
+    vim.schedule(function()
+        vim.notify(
+            ("LSP '%s' not enabled: executable '%s' not found in PATH"):format(name, exe),
+            vim.log.levels.WARN
+        )
+    end)
 end
 
-local Lsp_Servers = {
+-- LSP server table.
+local lsp_servers = {
     {
         name = "clangd",
         cfg = {
             cmd = { "clangd" },
             filetypes = { "c", "cpp", "objc", "objcpp" },
-            init_options = {
-                fallbackFlags = { "-I" .. "C:/sh1tz/apesticks/cc++/base/code" },
-            },
+            init_options = { fallbackFlags = { "-I" .. "C:/sh1tz/apesticks/cc++/base/code" }, },
         },
     },
     {
         name = "pyright",
-        cfg = {
-            cmd = { "pyright-langserver", "--stdio" },
-            filetypes = { "python" },
-        },
+        cfg = { cmd = { "pyright-langserver", "--stdio" }, filetypes = { "python" }, },
     },
     {
         name = "ols",
-        cfg = {
-            cmd = { "ols" },
-            filetypes = { "odin" },
-        },
+        cfg = { cmd = { "ols" }, filetypes = { "odin" }, },
     },
     {
         name = "jails",
-        cfg = {
-            cmd = { "jails" },
-            filetypes = { "jai" },
-        },
+        cfg = { cmd = { "jails" }, filetypes = { "jai" }, },
     },
 }
-
-for _, server in ipairs(Lsp_Servers) do
-    enable_if_exe(server.name, server.cfg)
+for _, server in ipairs(lsp_servers) do
+    enable_lsp_if_executable(server.name, server.cfg)
 end
 
--- turn off stupid LSP warning and error programming suggestions
+-- Keep diagnostics quiet in-buffer.
 vim.diagnostic.config({
     virtual_text = false,
     signs = false,
@@ -182,7 +181,7 @@ vim.diagnostic.config({
     severity_sort = false,
 })
 
--- Disable LSP semantic token highlighting (prevents color changes after LSP attaches)
+-- Disable semantic token colors so colorscheme stays stable.
 vim.api.nvim_create_autocmd("LspAttach", {
     callback = function(args)
         local client = vim.lsp.get_client_by_id(args.data.client_id)
@@ -191,5 +190,3 @@ vim.api.nvim_create_autocmd("LspAttach", {
         end
     end,
 })
---- End ---
---- End --
