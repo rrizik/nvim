@@ -73,7 +73,7 @@ _G.TabLine = tab_line
 vim.o.tabline = "%!v:lua.TabLine()"
 
 -- Build command and quickfix error parser.
-vim.opt.makeprg = [[cmd.exe /c ..\misc\build.bat]]
+vim.opt.makeprg = [[cmd.exe /c misc\build.bat]]
 vim.opt.errorformat = table.concat({
     -- clang/gcc style.
     [[%f:%l:%c:\ %trror:\ %m]],

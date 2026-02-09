@@ -26,7 +26,7 @@ local function build_async()
     end
 
     vim.api.nvim_echo({ { "Building...", "None" } }, false, {})
-    vim.g._build_job_id = vim.fn.jobstart({ "cmd.exe", "/c", [[\misc\build.bat]] }, {
+    vim.g._build_job_id = vim.fn.jobstart({ "cmd.exe", "/c", [[misc\build.bat]] }, {
         cwd = vim.fn.getcwd(),
         stdout_buffered = true,
         stderr_buffered = true,
