@@ -108,9 +108,9 @@ local function find_project_files()
     end
 end
 
--- Telescope keymaps.
-vim.keymap.set("n", "<C-p>", find_project_files)
-vim.keymap.set("n", "<leader>g", function()
+-- Telescope keymaps
+vim.keymap.set("n", "<leader>g", find_project_files)
+vim.keymap.set("n", "<C-p>", function()
     setup_telescope_once()
     telescope_builtin.find_files({
         hidden = true,
