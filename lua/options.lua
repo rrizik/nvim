@@ -1,8 +1,20 @@
 -- lua/options.lua
 
--- Basic startup globals.
+-- Disable unused built-in runtime plugins before runtime/plugin loads.
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
+vim.g.loaded_gzip = 1
+vim.g.loaded_tarPlugin = 1
+vim.g.loaded_zipPlugin = 1
+vim.g.loaded_tutor_mode_plugin = 1
+vim.g.loaded_2html_plugin = 1
+vim.g.loaded_matchit = 1
+vim.g.loaded_spellfile_plugin = 1
+vim.g.loaded_remote_plugins = 1
+vim.g.editorconfig = false
+vim.g.termfeatures = { osc52 = false }
+
+-- Basic startup globals.
 vim.g.mapleader = " "
 
 -- UI/bootstrap settings.
@@ -35,6 +47,7 @@ vim.opt.splitright = true
 vim.opt.splitbelow = true
 vim.opt.wrap = true
 vim.opt.linebreak = true
+vim.opt.synmaxcol = 300
 
 -- Misc editor behavior.
 vim.opt.belloff = "all"
@@ -50,8 +63,10 @@ vim.opt.foldcolumn = "0"
 vim.opt.title = true
 vim.opt.titlestring = "%t"
 
--- Custom tabline (file name for each tab).
-local function tab_line()
+-- Custom tabline cache (file name for each tab).
+local tabline_cache = nil
+
+local function build_tab_line()
     local s = ""
     for t = 1, vim.fn.tabpagenr("$") do
         local b = vim.fn.tabpagebuflist(t)[vim.fn.tabpagewinnr(t)]
@@ -69,8 +84,32 @@ local function tab_line()
     end
     return s .. "%#TabLineFill#%="
 end
-_G.TabLine = tab_line
+
+local function invalidate_tab_line()
+    tabline_cache = nil
+end
+
+_G.TabLine = function()
+    if not tabline_cache then
+        tabline_cache = build_tab_line()
+    end
+    return tabline_cache
+end
+
 vim.o.tabline = "%!v:lua.TabLine()"
+local tabline_group = vim.api.nvim_create_augroup("CustomTabLine", { clear = true })
+vim.api.nvim_create_autocmd({
+    "TabNew",
+    "TabClosed",
+    "TabEnter",
+    "WinEnter",
+    "BufEnter",
+    "BufFilePost",
+    "BufDelete",
+}, {
+    group = tabline_group,
+    callback = invalidate_tab_line,
+})
 
 -- Build command and quickfix error parser.
 vim.opt.makeprg = [[cmd.exe /c misc\build.bat]]
@@ -119,9 +158,14 @@ vim.api.nvim_create_autocmd("CmdlineLeave", {
     end,
 })
 
--- LSP enable-once helper.
-local missing_lsp_exe_warned = {}
-local function enable_lsp_if_executable(name, cfg)
+-- LSP setup is deferred until a matching filetype appears.
+local enabled_lsp_servers = {}
+local missing_lsp_exes = {}
+local function enable_lsp_for_filetype(name, cfg, args)
+    if enabled_lsp_servers[name] then
+        return
+    end
+
     local exe = cfg.cmd and cfg.cmd[1]
     if not exe then
         return
@@ -130,19 +174,27 @@ local function enable_lsp_if_executable(name, cfg)
     if vim.fn.executable(exe) == 1 then
         vim.lsp.config(name, cfg)
         vim.lsp.enable(name)
+        enabled_lsp_servers[name] = true
+
+        -- During startup, vim.lsp.enable() does not replay the current FileType event.
+        if vim.v.vim_did_enter == 0 and args and args.buf then
+            pcall(vim.api.nvim_exec_autocmds, "FileType", {
+                group = "nvim.lsp.enable",
+                buffer = args.buf,
+                modeline = false,
+            })
+        end
         return
     end
 
-    if missing_lsp_exe_warned[exe] then
+    if missing_lsp_exes[exe] then
         return
     end
-    missing_lsp_exe_warned[exe] = true
-    vim.schedule(function()
-        vim.notify(
-            ("LSP '%s' not enabled: executable '%s' not found in PATH"):format(name, exe),
-            vim.log.levels.WARN
-        )
-    end)
+    missing_lsp_exes[exe] = true
+    vim.notify(
+        ("LSP '%s' not enabled: executable '%s' not found in PATH"):format(name, exe),
+        vim.log.levels.WARN
+    )
 end
 
 -- LSP server table.
@@ -168,8 +220,18 @@ local lsp_servers = {
         cfg = { cmd = { "jails" }, filetypes = { "jai" }, },
     },
 }
+
+local lsp_filetype_group = vim.api.nvim_create_augroup("DeferredLspEnable", { clear = true })
 for _, server in ipairs(lsp_servers) do
-    enable_lsp_if_executable(server.name, server.cfg)
+    local name = server.name
+    local cfg = server.cfg
+    vim.api.nvim_create_autocmd("FileType", {
+        group = lsp_filetype_group,
+        pattern = cfg.filetypes,
+        callback = function(args)
+            enable_lsp_for_filetype(name, cfg, args)
+        end,
+    })
 end
 
 -- Keep diagnostics quiet in-buffer.

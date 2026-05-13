@@ -21,6 +21,9 @@ end
 
 function M.apply()
     vim.cmd([[
+    " --- bounded syntax sync ---
+    syntax sync minlines=64 maxlines=256
+
     " --- comment markers ---
     syn keyword cRed    contained TODO FIXME WRONG XXX Todo FixMe Wrong todo fixme wrong xxx
     syn keyword cYellow contained SPEED SLOW CLEANUP INCOMPLETE STUDY QUESTION FUTURE CONSIDER NOTCLEAR UNTESTED TESTING NOCHECKIN YUCK WARNING Speed Slow Cleanup Incomplete Study Question Future Consider NotClear Untested Testing NoCheckin Yuck Warning speed slow cleanup incomplete study question future consider notclear untested testing nocheckin yuck warning

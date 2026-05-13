@@ -3,66 +3,15 @@
 local map = vim.keymap.set
 local nore_silent = { noremap = true, silent = true }
 
--- Async build and quickfix populate.
-local function build_async()
-    vim.cmd("wall")
+-- Quickfix error filters and cached movement targets.
+local qf_error_indexes = {}
+local qf_cache_id = nil
+local qf_cache_changedtick = nil
 
-    -- Stop an already running build before starting a new one.
-    if vim.g._build_job_id and vim.fn.jobwait({ vim.g._build_job_id }, 0)[1] == -1 then
-        vim.fn.jobstop(vim.g._build_job_id)
-    end
-
-    local lines = {}
-    local function on_data(_, data)
-        if not data then
-            return
-        end
-        for _, s in ipairs(data) do
-            s = s:gsub("\r", "")
-            if s ~= "" then
-                table.insert(lines, s)
-            end
-        end
-    end
-
-    vim.api.nvim_echo({ { "Building...", "None" } }, false, {})
-    vim.g._build_job_id = vim.fn.jobstart({ "cmd.exe", "/c", [[misc\build.bat]] }, {
-        cwd = vim.fn.getcwd(),
-        stdout_buffered = true,
-        stderr_buffered = true,
-        on_stdout = on_data,
-        on_stderr = on_data,
-        on_exit = function(_, code)
-            vim.fn.setqflist({}, "r", {
-                title = ("build (exit %d)"):format(code),
-                lines = lines,
-                efm = vim.o.errorformat,
-            })
-            vim.g.qf_first_pending = 1
-
-            vim.schedule(function()
-                local qf = vim.fn.getqflist()
-                local errors = 0
-                for _, item in ipairs(qf) do
-                    if item.valid == 1 then
-                        local text = (item.text or ""):lower()
-                        local is_note = text:find("declaration of", 1, true) or text:find("note:", 1, true)
-                        if not is_note and (item.type == "E" or item.type == "") then
-                            errors = errors + 1
-                        end
-                    end
-                end
-                vim.cmd("cwindow")
-                vim.api.nvim_echo({
-                    { ("Build finished - %d errors"):format(errors), "None" },
-                }, false, {})
-            end)
-        end,
-    })
+local function qf_info()
+    return vim.fn.getqflist({ id = 0, changedtick = 0, idx = 0, size = 0 })
 end
-map("n", "<C-k>", build_async, nore_silent)
 
--- Quickfix error filters and movement.
 local function qf_is_error(item)
     if item.valid ~= 1 then
         return false
@@ -74,44 +23,113 @@ local function qf_is_error(item)
     return item.type == "E" or item.type == ""
 end
 
-local function qf_jump_to_first_error()
-    local qf = vim.fn.getqflist()
-    for i, item in ipairs(qf) do
+local function qf_rebuild_error_cache()
+    qf_error_indexes = {}
+    for i, item in ipairs(vim.fn.getqflist()) do
         if qf_is_error(item) then
-            vim.cmd(("cc %d"):format(i))
-            return true
+            qf_error_indexes[#qf_error_indexes + 1] = i
         end
     end
-    return false
+
+    local info = qf_info()
+    qf_cache_id = info.id
+    qf_cache_changedtick = info.changedtick
+    return #qf_error_indexes
+end
+
+local function qf_ensure_error_cache()
+    local info = qf_info()
+    if info.size == 0 then
+        qf_error_indexes = {}
+        qf_cache_id = info.id
+        qf_cache_changedtick = info.changedtick
+        return false
+    end
+
+    if qf_cache_id ~= info.id or qf_cache_changedtick ~= info.changedtick then
+        qf_rebuild_error_cache()
+    end
+    return #qf_error_indexes > 0
+end
+
+local function qf_jump_to_first_error()
+    if not qf_ensure_error_cache() then
+        return false
+    end
+    vim.cmd(("cc %d"):format(qf_error_indexes[1]))
+    return true
 end
 
 local function qf_jump_to_next_error()
-    local qf = vim.fn.getqflist()
-    if #qf == 0 then
+    if not qf_ensure_error_cache() then
         return
     end
 
-    local info = vim.fn.getqflist({ idx = 0 })
-    local start = info.idx or 0
-
-    for i = start + 1, #qf do
-        if qf_is_error(qf[i]) then
-            vim.cmd(("cc %d"):format(i))
+    local start = qf_info().idx or 0
+    for _, qf_index in ipairs(qf_error_indexes) do
+        if qf_index > start then
+            vim.cmd(("cc %d"):format(qf_index))
             return
         end
     end
-    for i = 1, start do
-        if qf_is_error(qf[i]) then
-            vim.cmd(("cc %d"):format(i))
-            return
-        end
-    end
-    vim.cmd.cfirst()
+    vim.cmd(("cc %d"):format(qf_error_indexes[1]))
 end
 
+-- Async build and quickfix populate.
+local function build_async()
+    vim.cmd("wall")
+
+    -- Stop an already running build before starting a new one.
+    if vim.g._build_job_id and vim.fn.jobwait({ vim.g._build_job_id }, 0)[1] == -1 then
+        vim.fn.jobstop(vim.g._build_job_id)
+    end
+
+    local output_chunks = {}
+    local function on_data(_, data)
+        if not data then
+            return
+        end
+        for _, s in ipairs(data) do
+            if s ~= "" then
+                output_chunks[#output_chunks + 1] = s
+            end
+        end
+    end
+
+    vim.api.nvim_echo({ { "Building...", "None" } }, false, {})
+    vim.g._build_job_id = vim.fn.jobstart({ "cmd.exe", "/c", [[misc\build.bat]] }, {
+        cwd = vim.fn.getcwd(),
+        stdout_buffered = false,
+        stderr_buffered = false,
+        on_stdout = on_data,
+        on_stderr = on_data,
+        on_exit = function(_, code)
+            local lines = {}
+            for _, s in ipairs(output_chunks) do
+                lines[#lines + 1] = s:gsub("\r", "")
+            end
+
+            vim.fn.setqflist({}, "r", {
+                title = ("build (exit %d)"):format(code),
+                lines = lines,
+                efm = vim.o.errorformat,
+            })
+            vim.g.qf_first_pending = 1
+
+            vim.schedule(function()
+                local errors = qf_rebuild_error_cache()
+                vim.cmd("cwindow")
+                vim.api.nvim_echo({
+                    { ("Build finished - %d errors"):format(errors), "None" },
+                }, false, {})
+            end)
+        end,
+    })
+end
+map("n", "<C-k>", build_async, nore_silent)
+
 map("n", "<C-n>", function()
-    local qf = vim.fn.getqflist()
-    if #qf == 0 then
+    if not qf_ensure_error_cache() then
         return
     end
     if vim.g.qf_first_pending == 1 then
