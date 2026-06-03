@@ -104,6 +104,18 @@ local function entry_abs_path(entry)
     return vim.loop.fs_realpath(p) or vim.fn.fnamemodify(p, ":p")
 end
 
+local function entry_pos(entry)
+    local lnum = tonumber(entry.lnum)
+    local col = tonumber(entry.col)
+    if not lnum or lnum < 1 then
+        return nil
+    end
+    if not col or col < 1 then
+        col = 1
+    end
+    return lnum, col
+end
+
 -- One-time Telescope setup, called by keymaps.
 local function setup_telescope_once()
     if telescope_ready then
@@ -127,6 +139,11 @@ local function setup_telescope_once()
             end
 
             vim.cmd(cmd .. " " .. vim.fn.fnameescape(p))
+            local lnum, col = entry_pos(entry)
+            if lnum then
+                pcall(vim.api.nvim_win_set_cursor, 0, { lnum, col - 1 })
+                vim.cmd("normal! zv")
+            end
         end
     end
 
@@ -189,7 +206,9 @@ vim.keymap.set("n", "<C-s>", function()
     if not setup_telescope_once() then
         return
     end
-    telescope_builtin.live_grep()
+    telescope_builtin.live_grep({
+        additional_args = { "--fixed-strings" },
+    })
 end)
 
 vim.api.nvim_create_autocmd("VimEnter", {

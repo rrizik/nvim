@@ -20,7 +20,7 @@ local function qf_is_error(item)
     if text:find("declaration of", 1, true) or text:find("note:", 1, true) then
         return false
     end
-    return item.type == "E" or item.type == ""
+    return item.type == "E" or item.type == "e" or item.type == ""
 end
 
 local function qf_rebuild_error_cache()
@@ -73,6 +73,22 @@ local function qf_jump_to_next_error()
         end
     end
     vim.cmd(("cc %d"):format(qf_error_indexes[1]))
+end
+
+local function qf_jump_to_prev_error()
+    if not qf_ensure_error_cache() then
+        return
+    end
+
+    local start = qf_info().idx or 0
+    for i = #qf_error_indexes, 1, -1 do
+        local qf_index = qf_error_indexes[i]
+        if qf_index < start then
+            vim.cmd(("cc %d"):format(qf_index))
+            return
+        end
+    end
+    vim.cmd(("cc %d"):format(qf_error_indexes[#qf_error_indexes]))
 end
 
 -- Async build and quickfix populate.
@@ -142,10 +158,7 @@ map("n", "<C-n>", function()
 end, { silent = true })
 
 map("n", "<C-b>", function()
-    local ok = pcall(vim.cmd.cprev)
-    if not ok then
-        vim.cmd.clast()
-    end
+    qf_jump_to_prev_error()
 end, { silent = true })
 
 map("n", "<C-j>", "<cmd>wall<CR>", nore_silent)

@@ -23,6 +23,11 @@ vim.opt.guifont = "Consolas:h11"
 vim.cmd.syntax("on")
 vim.cmd.colorscheme("custom")
 
+if vim.g.neovide then
+    vim.g.neovide_cursor_animation_length = 0.05
+    vim.g.neovide_cursor_trail_size = 0.5
+end
+
 -- Search behavior.
 vim.opt.magic = false
 vim.opt.incsearch = true
@@ -62,6 +67,59 @@ vim.opt.guicursor = "a:blinkon0"
 vim.opt.foldcolumn = "0"
 vim.opt.title = true
 vim.opt.titlestring = "%t"
+
+vim.api.nvim_set_hl(0, "CursorCharBold", { bold = true })
+
+local cursor_char_ns = vim.api.nvim_create_namespace("CursorCharBold")
+local cursor_char_last_buf = nil
+
+local function update_cursor_char_bold()
+    if cursor_char_last_buf and vim.api.nvim_buf_is_loaded(cursor_char_last_buf) then
+        vim.api.nvim_buf_clear_namespace(cursor_char_last_buf, cursor_char_ns, 0, -1)
+    end
+
+    local buf = vim.api.nvim_get_current_buf()
+    cursor_char_last_buf = buf
+
+    local pos = vim.api.nvim_win_get_cursor(0)
+    local row = pos[1] - 1
+    local col = pos[2]
+    local line = vim.api.nvim_get_current_line()
+    local len = #line
+    if len == 0 then
+        return
+    end
+    if col >= len then
+        col = len - 1
+    end
+
+    vim.api.nvim_buf_set_extmark(buf, cursor_char_ns, row, col, {
+        end_col = col + 1,
+        hl_group = "CursorCharBold",
+        hl_eol = false,
+        hl_mode = "combine",
+        priority = 10000,
+    })
+end
+
+local cursor_char_group = vim.api.nvim_create_augroup("CursorCharBold", { clear = true })
+vim.api.nvim_create_autocmd({
+    "BufEnter",
+    "ColorScheme",
+    "CursorMoved",
+    "CursorMovedI",
+    "ModeChanged",
+    "TextChanged",
+    "TextChangedI",
+    "VimEnter",
+    "WinEnter",
+}, {
+    group = cursor_char_group,
+    callback = function()
+        vim.api.nvim_set_hl(0, "CursorCharBold", { bold = true })
+        update_cursor_char_bold()
+    end,
+})
 
 -- Custom tabline cache (file name for each tab).
 local tabline_cache = nil
@@ -131,6 +189,8 @@ vim.opt.errorformat = table.concat({
     [[%f(%l):\ %*[^ ]\ %*[^ ]\ %m]],
     [[%f(%l):\ %trror\ %m]],
     [[%f(%l):\ %tarning\ %m]],
+    [[%f(%l)\ :\ %trror\ %m]],
+    [[%f(%l)\ :\ %tarning\ %m]],
 
     -- Fallback linker-ish messages.
     [[%*[^:]:\ %m]],

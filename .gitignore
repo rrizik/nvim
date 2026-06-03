@@ -2,3 +2,5 @@
 plugin/
 plan.md
 *.png
+.nvimlog
+*.md
